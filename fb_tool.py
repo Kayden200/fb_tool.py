@@ -1,8 +1,7 @@
 import os
 import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
+import requests
+from bs4 import BeautifulSoup
 
 def banner():
     os.system('clear')
@@ -23,69 +22,74 @@ def banner():
     print("[00] Exit")
     print("\033[95m========================================\033[0m")
 
-def fb_login(driver, email, password):
-    driver.get("https://m.facebook.com/login")
-    time.sleep(3)
+def fb_login(email, password):
+    session = requests.Session()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Mobile Safari/537.36"
+    }
 
-    driver.find_element(By.ID, "m_login_email").send_keys(email)
-    driver.find_element(By.ID, "m_login_password").send_keys(password, Keys.RETURN)
-    time.sleep(5)
+    login_page = session.get("https://m.facebook.com/login", headers=headers)
+    soup = BeautifulSoup(login_page.text, "html.parser")
+    form = soup.find("form")
+    
+    if not form:
+        print("\033[91m[!] Failed to load Facebook login page.\033[0m")
+        return None
 
-    if "checkpoint" in driver.current_url:
-        print("\033[91m[!] Facebook Checkpoint Detected. Solve it manually.\033[0m")
-        return False
-    print("\033[92m[✔] Logged in successfully!\033[0m")
-    return True
+    action_url = form["action"]
+    data = {tag["name"]: tag["value"] for tag in form.find_all("input") if tag.get("name")}
+    data["email"] = email
+    data["pass"] = password
+
+    login_response = session.post(f"https://m.facebook.com{action_url}", data=data, headers=headers)
+
+    if "c_user" in session.cookies:
+        print("\033[92m[✔] Logged in successfully!\033[0m")
+        return session
+    else:
+        print("\033[91m[!] Login failed! Check your credentials.\033[0m")
+        return None
 
 def fb_react():
     print("\n\033[92m[✔] Starting FB React...\033[0m")
-    
-    # User enters dummy Facebook account
+
     email = input("Enter your dummy Facebook email: ")
     password = input("Enter your dummy Facebook password: ")
 
-    # Setup Chromium options for Termux
-    options = webdriver.ChromeOptions()
-    options.binary_location = "/data/data/com.termux/files/usr/bin/chromium"
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-
-    driver = webdriver.Chrome(options=options)
-
-    if not fb_login(driver, email, password):
-        driver.quit()
+    session = fb_login(email, password)
+    if not session:
         return
 
-    # User chooses reaction type
     post_url = input("Enter the Facebook post URL: ")
     reaction_type = input("Choose reaction (like/love/haha/wow/sad/angry): ").lower()
 
     reactions = {
-        "like": "Like",
-        "love": "Love",
-        "haha": "Haha",
-        "wow": "Wow",
-        "sad": "Sad",
-        "angry": "Angry"
+        "like": "1",
+        "love": "2",
+        "haha": "4",
+        "wow": "3",
+        "sad": "7",
+        "angry": "8"
     }
 
     if reaction_type not in reactions:
         print("\033[91m[!] Invalid reaction type!\033[0m")
-        driver.quit()
         return
 
-    driver.get(post_url)
-    time.sleep(3)
+    post_id = post_url.split("posts/")[-1].split("?")[0]
+    react_url = f"https://m.facebook.com/reactions/picker/?ft_id={post_id}"
+    
+    react_page = session.get(react_url)
+    soup = BeautifulSoup(react_page.text, "html.parser")
+    react_buttons = soup.find_all("a", href=True)
 
-    try:
-        react_button = driver.find_element(By.XPATH, f"//div[@aria-label='{reactions[reaction_type]}']")
-        react_button.click()
-        print("\033[92m[✔] Reacted successfully!\033[0m")
-    except:
-        print("\033[91m[!] Could not find the react button.\033[0m")
+    for button in react_buttons:
+        if f"reaction_type={reactions[reaction_type]}" in button["href"]:
+            session.get(f"https://m.facebook.com{button['href']}")
+            print("\033[92m[✔] Reacted successfully!\033[0m")
+            return
 
-    driver.quit()
+    print("\033[91m[!] Failed to react to the post.\033[0m")
 
 def fb_spam_share():
     print("\n\033[92m[✔] FB Spam Share Feature Coming Soon!\033[0m")
