@@ -3,54 +3,81 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
-# ✅ Machine Liker URLs
-MACHINE_LIKER_LOGIN = "https://machine-liker.com/login"
-MACHINE_LIKER_BOOST = "https://machine-liker.com/boost"
+# ✅ Yolikers URLs
+YOLIKERS_LOGIN_URL = "https://yolikers.com/login"
+YOLIKERS_DASHBOARD_URL = "https://yolikers.com/dashboard"
+YOLIKERS_BOOST_URL = "https://yolikers.com/send-reactions"
+FB_PROFILE_URL = "https://graph.facebook.com/{}/picture?type=large"
 
-# ✅ Function to log in to Machine Liker
-def machine_liker_login(email, password):
+# ✅ Function to check if Facebook account has a profile picture
+def check_profile_picture(fb_id):
+    response = requests.get(FB_PROFILE_URL.format(fb_id))
+    if response.status_code == 200 and "image" in response.headers["Content-Type"]:
+        print("\033[92m[✔] Profile picture found!\033[0m")
+        return True
+    print("\033[91m[!] No profile picture found! This account cannot use Yolikers.\033[0m")
+    return False
+
+# ✅ Function to log in to Yolikers and fetch session/token
+def yolikers_login(email, password):
     session = requests.Session()
     headers = {
         "User-Agent": "Mozilla/5.0 (Linux; Android 12; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.5481.153 Mobile Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://machine-liker.com/",
+        "Referer": "https://yolikers.com/",
     }
 
-    login_page = session.get(MACHINE_LIKER_LOGIN, headers=headers)
-
+    login_page = session.get(YOLIKERS_LOGIN_URL, headers=headers)
     if login_page.status_code != 200:
-        print("\033[91m[!] Failed to load Machine Liker login page.\033[0m")
-        return None
+        print("\033[91m[!] Failed to load Yolikers login page.\033[0m")
+        return None, None
 
     soup = BeautifulSoup(login_page.text, "html.parser")
     form = soup.find("form")
 
     if not form:
-        print("\033[91m[!] Could not find login form on Machine Liker.\033[0m")
-        return None
+        print("\033[91m[!] Could not find login form on Yolikers.\033[0m")
+        return None, None
 
     data = {tag["name"]: tag.get("value", "") for tag in form.find_all("input") if tag.get("name")}
     data["email"] = email
     data["password"] = password
 
-    login_response = session.post(MACHINE_LIKER_LOGIN, data=data, headers=headers)
+    login_response = session.post(YOLIKERS_LOGIN_URL, data=data, headers=headers)
 
     if "session" in session.cookies:
-        print("\033[92m[✔] Logged in to Machine Liker successfully!\033[0m")
-        return session
-    else:
-        print("\033[91m[!] Machine Liker login failed!\033[0m")
-        return None
+        print("\033[92m[✔] Logged in to Yolikers successfully!\033[0m")
 
-# ✅ Function for FB React (Using Machine Liker)
+        # ✅ Fetch Token from Dashboard
+        dashboard_page = session.get(YOLIKERS_DASHBOARD_URL, headers=headers)
+        soup = BeautifulSoup(dashboard_page.text, "html.parser")
+        token_input = soup.find("input", {"name": "token"})
+
+        if token_input:
+            token = token_input["value"]
+            print("\033[92m[✔] Token retrieved successfully!\033[0m")
+            return session, token
+        else:
+            print("\033[91m[!] Failed to retrieve token.\033[0m")
+            return None, None
+    else:
+        print("\033[91m[!] Yolikers login failed!\033[0m")
+        return None, None
+
+# ✅ Function for FB React (Using Yolikers)
 def fb_react():
     print("\n\033[92m[✔] Starting FB React...\033[0m")
 
     email = input("Enter your dummy Facebook email: ")
     password = input("Enter your dummy Facebook password: ")
+    fb_id = input("Enter your Facebook ID: ")  # Needed to check profile picture
 
-    session = machine_liker_login(email, password)
-    if not session:
+    # ✅ Check if account has a profile picture
+    if not check_profile_picture(fb_id):
+        return
+
+    session, token = yolikers_login(email, password)
+    if not session or not token:
         return
 
     print("\n\033[96mChoose a reaction:\033[0m")
@@ -75,11 +102,12 @@ def fb_react():
     post_url = input("\033[96mEnter the Facebook post URL: \033[0m")
 
     boost_data = {
+        "token": token,
         "post_url": post_url,
         "reaction": reactions[reaction_choice]
     }
 
-    boost_response = session.post(MACHINE_LIKER_BOOST, data=boost_data)
+    boost_response = session.post(YOLIKERS_BOOST_URL, data=boost_data)
 
     if boost_response.status_code == 200:
         print("\033[92m[✔] Reaction boosted successfully!\033[0m")
