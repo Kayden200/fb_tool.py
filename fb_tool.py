@@ -1,6 +1,5 @@
 import os
 import time
-import undetected_chromedriver as uc
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -25,11 +24,11 @@ def banner():
     print("\033[95m========================================\033[0m")
 
 def fb_login(driver, email, password):
-    driver.get("https://www.facebook.com/login")
+    driver.get("https://m.facebook.com/login")
     time.sleep(3)
 
-    driver.find_element(By.ID, "email").send_keys(email)
-    driver.find_element(By.ID, "pass").send_keys(password, Keys.RETURN)
+    driver.find_element(By.ID, "m_login_email").send_keys(email)
+    driver.find_element(By.ID, "m_login_password").send_keys(password, Keys.RETURN)
     time.sleep(5)
 
     if "checkpoint" in driver.current_url:
@@ -45,9 +44,14 @@ def fb_react():
     email = input("Enter your dummy Facebook email: ")
     password = input("Enter your dummy Facebook password: ")
 
+    # Setup Chromium options for Termux
     options = webdriver.ChromeOptions()
+    options.binary_location = "/data/data/com.termux/files/usr/bin/chromium"
     options.add_argument("--headless")
-    driver = uc.Chrome(options=options)
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+
+    driver = webdriver.Chrome(options=options)
 
     if not fb_login(driver, email, password):
         driver.quit()
