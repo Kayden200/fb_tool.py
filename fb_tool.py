@@ -3,104 +3,108 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
-def banner():
-    os.system('clear')
-    print("\033[95m")
-    print("██████╗ ██╗   ██╗██╗     ███████╗")
-    print("██╔══██╗██║   ██║██║     ██╔════╝")
-    print("██████╔╝██║   ██║██║     █████╗  ")
-    print("██╔═══╝ ██║   ██║██║     ██╔══╝  ")
-    print("██║     ╚██████╔╝███████╗███████╗")
-    print("╚═╝      ╚═════╝ ╚══════╝╚══════╝\033[0m")
-    print("\033[94m      DEVELOPED BY RYLE - WORKING IN THE SHADOWS\033[0m")
-    print("\033[95m========================================\033[0m")
-    print(" YOUR FACEBOOK AUTOMATION TOOL")
-    print("\033[95m========================================\033[0m")
-    print("[01] FB React      -  Auto react to posts")
-    print("[02] FB Spam Share -  Share posts multiple times")
-    print("[03] FB Auto Create - Create Facebook accounts")
-    print("[00] Exit")
-    print("\033[95m========================================\033[0m")
+# ✅ Flikers login URL
+FLIKERS_LOGIN_URL = "https://flikers.com/login"
+FLIKERS_BOOST_URL = "https://flikers.com/boost"
 
-def fb_login(email, password):
+# ✅ Function to log in to Flikers
+def flikers_login(email, password):
     session = requests.Session()
     headers = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Mobile Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Linux; Android 12; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.5481.153 Mobile Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://flikers.com/",
     }
 
-    login_page = session.get("https://m.facebook.com/login", headers=headers)
+    login_page = session.get(FLIKERS_LOGIN_URL, headers=headers)
+
+    if login_page.status_code != 200:
+        print("\033[91m[!] Failed to load Flikers login page.\033[0m")
+        return None
+
     soup = BeautifulSoup(login_page.text, "html.parser")
     form = soup.find("form")
-    
+
     if not form:
-        print("\033[91m[!] Failed to load Facebook login page.\033[0m")
+        print("\033[91m[!] Could not find login form on Flikers.\033[0m")
         return None
 
-    action_url = form["action"]
-    data = {tag["name"]: tag["value"] for tag in form.find_all("input") if tag.get("name")}
+    data = {tag["name"]: tag.get("value", "") for tag in form.find_all("input") if tag.get("name")}
     data["email"] = email
-    data["pass"] = password
+    data["password"] = password
 
-    login_response = session.post(f"https://m.facebook.com{action_url}", data=data, headers=headers)
+    login_response = session.post(FLIKERS_LOGIN_URL, data=data, headers=headers)
 
-    if "c_user" in session.cookies:
-        print("\033[92m[✔] Logged in successfully!\033[0m")
+    if "session" in session.cookies:
+        print("\033[92m[✔] Logged in to Flikers successfully!\033[0m")
         return session
     else:
-        print("\033[91m[!] Login failed! Check your credentials.\033[0m")
+        print("\033[91m[!] Flikers login failed!\033[0m")
         return None
 
+# ✅ Function for FB React (Using Flikers)
 def fb_react():
     print("\n\033[92m[✔] Starting FB React...\033[0m")
 
     email = input("Enter your dummy Facebook email: ")
     password = input("Enter your dummy Facebook password: ")
 
-    session = fb_login(email, password)
+    session = flikers_login(email, password)
     if not session:
         return
 
-    post_url = input("Enter the Facebook post URL: ")
-    reaction_type = input("Choose reaction (like/love/haha/wow/sad/angry): ").lower()
-
+    print("\n\033[96mChoose a reaction:\033[0m")
     reactions = {
-        "like": "1",
-        "love": "2",
-        "haha": "4",
-        "wow": "3",
-        "sad": "7",
-        "angry": "8"
+        "1": "Like",
+        "2": "Love",
+        "3": "Haha",
+        "4": "Wow",
+        "5": "Sad",
+        "6": "Angry"
     }
 
-    if reaction_type not in reactions:
+    for key, value in reactions.items():
+        print(f"[{key}] {value}")
+
+    reaction_choice = input("\033[96mEnter your choice (1-6): \033[0m")
+    
+    if reaction_choice not in reactions:
         print("\033[91m[!] Invalid reaction type!\033[0m")
         return
 
-    post_id = post_url.split("posts/")[-1].split("?")[0]
-    react_url = f"https://m.facebook.com/reactions/picker/?ft_id={post_id}"
-    
-    react_page = session.get(react_url)
-    soup = BeautifulSoup(react_page.text, "html.parser")
-    react_buttons = soup.find_all("a", href=True)
+    post_url = input("\033[96mEnter the Facebook post URL: \033[0m")
 
-    for button in react_buttons:
-        if f"reaction_type={reactions[reaction_type]}" in button["href"]:
-            session.get(f"https://m.facebook.com{button['href']}")
-            print("\033[92m[✔] Reacted successfully!\033[0m")
-            return
+    boost_data = {
+        "post_url": post_url,
+        "reaction": reactions[reaction_choice]
+    }
 
-    print("\033[91m[!] Failed to react to the post.\033[0m")
+    boost_response = session.post(FLIKERS_BOOST_URL, data=boost_data)
 
+    if boost_response.status_code == 200:
+        print("\033[92m[✔] Reaction boosted successfully!\033[0m")
+    else:
+        print("\033[91m[!] Failed to boost reaction.\033[0m")
+
+# ✅ Function for FB Spam Share
 def fb_spam_share():
     print("\n\033[92m[✔] FB Spam Share Feature Coming Soon!\033[0m")
     time.sleep(2)
 
+# ✅ Function for FB Auto Create (Using TempMail)
 def fb_auto_create():
     print("\n\033[92m[✔] FB Auto Create Feature Coming Soon!\033[0m")
     time.sleep(2)
 
+# ✅ Main Menu
 while True:
-    banner()
+    os.system('clear')
+    print("\n\033[95m==== FB AUTOMATION TOOL ====\033[0m")
+    print("[1] FB React - Auto boost reactions")
+    print("[2] FB Spam Share - Auto share posts")
+    print("[3] FB Auto Create - Create new FB accounts")
+    print("[0] Exit")
+
     choice = input("\033[96mEnter your choice: \033[0m")
 
     if choice == "1":
@@ -114,4 +118,3 @@ while True:
         break
     else:
         print("\n\033[91mInvalid choice! Try again.\033[0m")
-    time.sleep(2)
